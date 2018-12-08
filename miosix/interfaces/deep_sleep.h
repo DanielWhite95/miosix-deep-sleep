@@ -53,8 +53,13 @@ namespace miosix {
 **/
 void IRQdeepSleep ( long long abstime );
 
+/**
+ * Function called during boot process by IRQbspInit to setup support for deep sleep state
+ */
+void IRQdeepSleepInit () ;
 
 }
+
 
 
 

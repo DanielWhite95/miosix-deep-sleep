@@ -41,6 +41,11 @@
 #include <stdexcept>
 #include <algorithm>
 #include <string.h>
+
+#ifdef WITH_DEEP_SLEEP 
+#include "interfaces/deep_sleep.h"
+#endif // WITH_DEEP_SLEEP
+
 /*
 Used by assembler context switch macros
 This variable is set by miosix::IRQfindNextThread in file kernel.cpp
@@ -75,7 +80,13 @@ bool kernel_started=false;///<\internal becomes true after startKernel.
 /// calls to these functions.
 static unsigned char interruptDisableNesting=0;
 
+#ifdef WITH_DEEP_SLEEP
+
+///  This variable is used to keep count of how many peripherals are actually used.
+/// If it 0 then the system can enter the deep sleep state
 static int deepSleepCounter = 0;
+
+#endif // WITH_DEEP_SLEEP
 
 #ifdef WITH_PROCESSES
 
@@ -103,14 +114,13 @@ void *idleThread(void *argv)
         //JTAG debuggers lose communication with the device if it enters sleep
         //mode, so to use debugging it is necessary to remove this instruction
         
-//FIX ME: deepsleep has not been integrated fully so the code is surrounded with ifdef 
-#ifdef BOARD_efm32gg332f1024_wandstem
-        bool sleep=false;
+#ifdef WITH_DEEP_SLEEP 
+	bool sleep=false;
         {
             FastInterruptDisableLock lock;
             if (deepSleepCounter == 0)
             {
-               miosix_private::IRQdeepSleep();
+               IRQdeepSleep();
             }
             else
                 sleep=true;
@@ -178,8 +188,9 @@ bool areInterruptsEnabled()
     return miosix_private::checkAreInterruptsEnabled();
 }
 
-//FIX ME: deepsleep has not been integrated fully so the code is surrounded with ifdef 
-#ifdef BOARD_efm32gg332f1024_wandstem
+// Usage of deep sleep macro to avoid not required memory allocation
+// and functions definitions 
+#ifdef WITH_DEEP_SLEEP
 void deepSleepLock()
 {
     atomicAdd(&deepSleepCounter,1);
@@ -189,7 +200,8 @@ void deepSleepUnlock()
 { 
     atomicAdd(&deepSleepCounter,-1);
 }
-#endif
+#endif // WITH_DEEP_SLEEP
+
 void startKernel()
 {
     sleepingList = new(std::nothrow) IntrusiveList<SleepData>;
