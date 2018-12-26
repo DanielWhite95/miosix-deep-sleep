@@ -120,7 +120,18 @@ void *idleThread(void *argv)
             FastInterruptDisableLock lock;
             if (deepSleepCounter == 0)
             {
-               IRQdeepSleep();
+		long long closest_wakeup_time = 0;
+		if (sleepingList->empty()) 
+		{
+			auto first_sleep = sleepingList->begin();
+			closest_wakeup_time = ( *first_sleep )->wakeup_time;
+		}
+		else 
+		{
+			// Should be changed because it may be too much high
+			closest_wakeup_time = 2147483647 ;
+		}
+	        IRQdeepSleep(closest_wakeup_time);
             }
             else
                 sleep=true;
@@ -135,6 +146,17 @@ void *idleThread(void *argv)
     return 0; //Just to avoid a compiler warning
 }
 
+#ifdef WITH_DEEP_SLEEP
+
+void deepSleepLock() {
+	atomicAdd(&deepSleepCounter, 1);
+}
+
+void deepSleepUnlock() {
+	atomicAdd(&deepSleepCounter, -1);
+}
+
+#endif // WITH_DEEP_SLEEP
 
 void disableInterrupts()
 {

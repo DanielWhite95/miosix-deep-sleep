@@ -61,66 +61,6 @@ long long irqTime=0;     //64bit software extension of scheduled irq time in tic
 Thread *waiting=nullptr; //waiting thread
 
 /**
- * \return the hardware counter
- */
-inline unsigned int IRQgetHwTick()
-{
-    unsigned int h1=RTC->CNTH;
-    unsigned int l1=RTC->CNTL;
-    unsigned int h2=RTC->CNTH;
-    if(h1==h2) return (h1<<16) | l1;
-    return (h2<<16) | RTC->CNTL;
-}
-
-/**
- * \return the time in ticks (hardware part + software extension to 64bits)
- */
-long long IRQgetTick()
-{
-    //Pending bit trick
-    unsigned int hwTime=IRQgetHwTick();
-    if((RTC->CRL & RTC_CRL_OWF) && IRQgetHwTick()>=hwTime)
-        return (swTime + static_cast<long long>(hwTime)) + (1LL<<32);
-    return swTime + static_cast<long long>(hwTime);
-}
-
-/**
- * Sleep the current thread till the specified time
- * \param tick absolute time in ticks
- * \param dLock used to reenable interrupts while sleeping
- * \return true if the wait time was in the past
- */
-bool IRQabsoluteWaitTick(long long tick, FastInterruptDisableLock& dLock)
-{
-    irqTime=tick;
-    unsigned int hwAlarm=(tick & 0xffffffffULL) - (swTime & 0xffffffffULL);
-    {
-        ScopedCnf cnf;
-        RTC->ALRL=hwAlarm;
-        RTC->ALRH=hwAlarm>>16;
-    }
-    //NOTE: We do not wait for the alarm register to be written back to the low
-    //frequency domain for performance reasons. The datasheet says it takes
-    //at least 3 cycles of the 32KHz clock, but experiments show that it takes
-    //from 2 to 3, so perhaps they meant "at most 3". Because of this we
-    //consider the time in the past if we are more than 2 ticks of the 16KHz
-    //clock (4 ticks of the 32KHz one) in advance. Sleeps less than 122us are
-    //thus not supported.
-    if(IRQgetTick()>=tick-2) return true;
-    waiting=Thread::IRQgetCurrentThread();
-    do {
-        Thread::IRQwait();
-        {
-            FastInterruptEnableLock eLock(dLock);
-            Thread::yield();
-        }
-    } while(waiting);
-    return false;
-}
-
-} //anon namespace
-
-/**
  * RTC interrupt
  */
 void __attribute__((naked)) RTC_IRQHandler()
@@ -155,93 +95,30 @@ void __attribute__((used)) RTCIrqImpl()
 
 namespace miosix {
 
-void absoluteDeepSleep(long long int value)
+void absoluteDeepSleep(long long int ns_value)
 {
+    FastInterrupDisableLock dlock;
     const long long wakeupAdvance=3; //waking up takes time
     
     Rtc& rtc=Rtc::instance();
     ioctl(STDOUT_FILENO,IOCTL_SYNC,0);
 
-    FastInterruptDisableLock dLock;
-    
-    //Set alarm and enable EXTI
-    //
-    long long tick=rtc.tc.ns2tick(value)-wakeupAdvance;
-    unsigned int hwAlarm=(tick & 0xffffffffULL) - (swTime & 0xffffffffULL);
-    RTC->CR = RTC_CR_ALRIAE;
-    // using WUTE 
-    // RTC->CR &= ~RTC_CR_WUTE;
-    // while( (RTC->ISR & RTC_ISR_WUTWF ) == 0 );
-    // RTC->WUTR = hwAlarm & RTC_WUTR_WUT; 
-    // RTC->CR &= ~RTC_CR_WUCKSEL; // select RTC/16 clock for wakeup
-    // RTC->CR |=  RTC_CR_WUTE;
+
+    unsigned long long int value = (ns_value % 1000000); // part less than 1 second  
+
+    EXTI->RTSR |= (1<<22);
+    EXTI->EMR  |= (1<<22); //enable event for wakeup
+
+    RTC->CR &= ~RTC_CR_WUTE;
+    while( (RTC->ISR & RTC_ISR_WUTWF ) == 0 );
+    RTC->CR |= (RTC_CR_WUCKSEL_0 | RTC_CR_WUCKSEL_1);
+    RTC->CR &= ~(RTC_CR_WUCKSEL_2) ; // select RTC/2 clock for wakeupt
+    RTC->WUTR = value & RTC_WUTR_WUT; 
+    RTC->CR |=  RTC_CR_WUTE;
     while((RTC->CR & RTC_CR_RTOFF)==0) ;
     
-    
-    EXTI->RTSR |= EXTI_RTSR_TR17;
-    EXTI->EMR  |= EXTI_EMR_MR17; //enable event for wakeup
-    
-    while(IRQgetTick()<tick)
-    {
-        PWR->CR |= PWR_CR_LPDS;
-	PWR->CR &= ~PWR_CR_FPDS;
-        SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
-	
-	// Can also disable ADC or DAC to ensure more senergy saving
-	//
-        // Using WFE instead of WFI because if while we are with interrupts
-        // disabled an interrupt (such as the tick interrupt) occurs, it
-        // remains pending and the WFI becomes a nop, and the device never goes
-        // in sleep mode. WFE events are latched in a separate pending register
-        // so interrupts do not interfere with them       
-        __WFE();
-        SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
-        PWR->CR &= ~PWR_CR_LPDS;
-        
-        #ifndef SYSCLK_FREQ_24MHz
-        #error TODO: support more PLL frequencies
-        #endif
-        //STOP mode resets the clock to the HSI 8MHz, so restore the 24MHz clock
-	// Shoulf be removed because stop mode allow only LSE or LSI clocks
-        #ifndef RUN_WITH_HSI
-        RCC->CR |= RCC_CR_HSEON;
-        while((RCC->CR & RCC_CR_HSERDY)==0) ;
-        //PLL = (HSE / 2) * 6 = 24 MHz
-        RCC->CFGR &= ~(RCC_CFGR_PLLSRC | RCC_CFGR_PLLXTPRE | RCC_CFGR_PLLMULL);
-        RCC->CFGR |=   RCC_CFGR_PLLSRC | RCC_CFGR_PLLXTPRE | RCC_CFGR_PLLMULL6;
-        #else //RUN_WITH_HSI
-        //PLL = (HSI / 2) * 6 = 24 MHz
-        RCC->CFGR &= ~(RCC_CFGR_PLLSRC | RCC_CFGR_PLLXTPRE | RCC_CFGR_PLLMULL);
-        RCC->CFGR |=                     RCC_CFGR_PLLXTPRE | RCC_CFGR_PLLMULL6;
-        #endif //RUN_WITH_HSI        
-        RCC->CR |= RCC_CR_PLLON;
-        while((RCC->CR & RCC_CR_PLLRDY)==0) ;
-        RCC->CFGR &= ~RCC_CFGR_SW;
-        RCC->CFGR |= RCC_CFGR_SW_PLL;    
-        while((RCC->CFGR & RCC_CFGR_SWS)!=0x08) ;
-        
-        //Wait RSF
-        RTC->CR=(RTC->CR | 0xf) & ~RTC_CR_RSF;
-        while((RTC->CR & RTC_CR_RSF)==0) ;
-        
-        //Clear IRQ
-        unsigned int crl=RTC->CRL;
-        if(crl & RTC_CRL_OWF)
-        {
-            //TODO: check that an overflow does cause a wakeup just like alarm
-            RTC->CRL=(RTC->CRL | 0xf) & ~RTC_CRL_OWF;
-            swTime+=1LL<<32;
-        } else if(crl & RTC_CRL_ALRF) {
-            RTC->CRL=(RTC->CRL | 0xf) & ~RTC_CRL_ALRF;
-        }
-    }
-    
-    EXTI->EMR &=~ EXTI_EMR_MR17; //disable event for wakeup
-    
-    tick+=wakeupAdvance;
-    while(IRQgetTick()<tick) ;
-}
 
+}
 //
 // class Rtc
 //
@@ -252,7 +129,7 @@ Rtc& Rtc::instance()
     return singleton;
 }
 
-long long Rtc::getValue() const
+long long Rtc::getSSR() const
 {
     //Function takes ~170 clock cycles ~60 cycles IRQgetTick, ~96 cycles tick2ns
     long long tick;
@@ -264,7 +141,7 @@ long long Rtc::getValue() const
     return tc.tick2ns(tick);
 }
 
-long long Rtc::IRQgetValue() const
+long long Rtc::IRQSgetSSR() const
 {
     return tc.tick2ns(IRQgetTick());
 }
@@ -287,7 +164,7 @@ bool Rtc::absoluteWait(long long value)
     return IRQabsoluteWaitTick(tc.ns2tick(value),dLock);
 }
 
-Rtc::Rtc() : tc(getTickFrequency())
+Rtc::Rtc() 
 {
     {
         FastInterruptDisableLock dLock;
@@ -296,24 +173,17 @@ Rtc::Rtc() : tc(getTickFrequency())
         RCC->BDCR=RCC_BDCR_RTCEN       //RTC enabled
                 | RCC_BDCR_LSEON       //External 32KHz oscillator enabled
                 | RCC_BDCR_RTCSEL_0;   //Select LSE as clock source for RTC
-        RCC_SYNC();
-        // BKP->RTCCR=BKP_RTCCR_CCO;      //Output RTC clock/64 on pin
     }
     while((RCC->BDCR & RCC_BDCR_LSERDY)==0) ; //Wait for LSE to start
     
-	// RE-enable write after backup reset
-
-    RTC->WPR = 0xCA;
-    RTC->WPR = 0x53;
-
-    RTC->CR= RTC_CR_ALRAIE;
-//    {
-//        ScopedCnf cnf;
-//        RTC->PRLH=0; 
-//        RTC->PRLL=1;
-//    }
-    NVIC_SetPriority(RTC_IRQn,5);
-    NVIC_EnableIRQ(RTC_IRQn);
+    {
+	FastInterruptDisableLock dlock;
+	EXTI->IMR |= (1<<22);
+	EXTI->RTSR |= (1<<22);
+	EXTI->FTSR &= ~(1<<22);
+	NVIC_SetPriority(RTC_WKUP_IRQn,5);
+	NVIC_EnableIRQ(RTC_WKUP_IRQn);
+    }
 }
 
 } //namespace miosix

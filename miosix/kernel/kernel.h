@@ -382,8 +382,8 @@ public:
 
     // Copy Class 
 private: 
-    DeepSleepLock(const DeepSleepLock&);
-    DeepSleepLock& operator= (const DeepSleepLock&);
+    DeepSleepLock(const DeepSleepLock&) =delete;
+    DeepSleepLock& operator= (const DeepSleepLock&) =delete;
 };
 
 #endif // WITH_DEEP_SLEEP

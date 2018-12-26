@@ -52,32 +52,11 @@ public:
      * \return an instance of this class
      */
     static Rtc& instance();
+    static unsigned int remaining_wakeup = 0;
 
-    /**
-     * \return the timer counter value in nanoseconds
-     */
-    long long getValue() const;
+    long long getSSR();
 
-    /**
-     * \return the timer counter value in nanoseconds
-     * 
-     * Can be called with interrupt disabled, or inside an interrupt
-     */
-    long long IRQgetValue() const;
-
-    /**
-     * Set the timer counter value
-     * \param value new timer value in nanoseconds
-     * 
-     * NOTE: if alarm is set wakeup time is not updated
-     */
-    void setValue(long long value);
-    
-    /**
-     * Put thread in wait for the specified relative time.
-     * This function wait for a relative time passed as parameter.
-     * \param value relative time to wait, expressed in nanoseconds
-     */
+    long long IRQgetSSR(FastInterruptDisableLock);
     void wait(long long value);
     
     /**
@@ -92,14 +71,13 @@ public:
     /**
      * \return the timer frequency in Hz
      */
-    unsigned int getTickFrequency() const { return 16384; }
+
+
 
 private:
     Rtc();
     Rtc(const Rtc&)=delete;
     Rtc& operator= (const Rtc&)=delete;
-    
-    TimeConversion tc;
     
     friend void absoluteDeepSleep(long long value);
 };
