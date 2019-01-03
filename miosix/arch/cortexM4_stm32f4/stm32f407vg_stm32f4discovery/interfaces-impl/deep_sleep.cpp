@@ -38,26 +38,37 @@ namespace miosix {
 // as described in the refernence manual of
 // STM32F407VG (the EXTI lines should be already
 // configured)
-void IRQdeepSleep ( long long int abstime) {
+  void IRQdeepSleep ( long long int abstime)
+  {
+    Rtc* rtc = Rtc::instance();
+    long long int reltime = abstime - getTime(); // as nanoseconds delay from now
+    if (reltime < 0)
+    {
+      return; // too late for sleeping
+    }
+    else
+    {
+      long long int wut_ticks = reltime / rtc->wkp_clock_period;
+      unsigned short int wut = wut_ticks % 128;
+      rtc->remaining_wakeups = wut_ticks / 128;
+      rtc->setWakeupTimer(wut);
+      __WFE();
+      while (rtc->remaining_wakeups > 0 )
+	{
+	  wut = 128;
+	  rtc->remaining_wakeups--;
+	  rtc->setWakeupTimer(wut);
+	  __WFE();
+	}
+    }
+  }
 
-    unsigned long long int value = (abstime % 1000000); // part less than 1 second  
-
-    RTC->CR &= ~RTC_CR_WUTE;
-    while( (RTC->ISR & RTC_ISR_WUTWF ) == 0 );
-    RTC->CR |= (RTC_CR_WUCKSEL_0 | RTC_CR_WUCKSEL_1);
-    RTC->CR &= ~(RTC_CR_WUCKSEL_2) ; // select RTC/2 clock for wakeup
-    RTC->WUTR = value & RTC_WUTR_WUT; 
-    RTC->CR |=  RTC_CR_WUTE;
-
-    __WFE();
-}
-
-// setup of the RTC registers
-// and configure it to allow RTC Wakeup IRQ
-void IRQdeepSleepInit () {
-	Rtc* rtc = Rtc::instance();
-	rtc->setWakeupInterrupt();
-}
-
+  // setup of the RTC registers
+  // and configure it to allow RTC Wakeup IRQ
+  void IRQdeepSleepInit ()
+  {
+    Rtc* rtc = Rtc::instance();
+    rtc->setWakeupInterrupt();
+  }
 
 }
