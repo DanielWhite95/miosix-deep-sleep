@@ -42,6 +42,17 @@ public:
      * \return the current tick count of the timer (in terms of nanoseconds)
      */
     long long getCurrentTime() const;
+
+    /**
+     * Set the current tick count of the timer as nanoseconds
+     */
+    void setCurrentTime(long long) const;
+
+    /**
+     * Set the current tick in a secure environment where interrupts are
+     * already disabled
+     */ 
+    void IRQsetCurrentTime(long long) const;
     
     /**
      * \return the current tick count of the timer (in terms of nanoseconds)
