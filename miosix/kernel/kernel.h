@@ -363,7 +363,6 @@ private:
     RestartKernelLock& operator= (const RestartKernelLock& l);
 };
 
-#ifdef WITH_DEEP_SLEEP
 /*Increment the deepSleepCounter variable, enabling deep sleep of MCU if the variable
  * holds a positive value*/ 
 void deepSleepLock();
@@ -386,7 +385,6 @@ private:
     DeepSleepLock& operator= (const DeepSleepLock&) =delete;
 };
 
-#endif // WITH_DEEP_SLEEP
 
 /**
  * \internal
@@ -1079,7 +1077,7 @@ struct SleepData : public IntrusiveListItem
     ///\internal Thread that is sleeping
     Thread *p;
     
-    ///\internal When this number becomes equal to the kernel tick,
+    ///\internal When this number becomes equal to the kernel stick,
     ///the thread will wake
     long long wakeup_time;
 };
