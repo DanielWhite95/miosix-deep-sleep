@@ -47,16 +47,22 @@
 
 namespace miosix {
 
-/** 
- * \param abstime : selected absolute time to wake up from deep sleep state. At this time the interrupt
- * from RTC will be executed
-**/
-void IRQdeepSleep ( long long abstime );
+  /** 
+   * \brief Put in deep sleep the board until the next wakeup schedule
+   *
+   * \param abstime : selected absolute time to wake up from deep sleep state. At this time the interrupt
+   * from RTC will be executed
+   */
+  void IRQdeepSleep ( unsigned long long abstime );
 
-/**
- * Function called during boot process by IRQbspInit to setup support for deep sleep state
- */
-void IRQdeepSleepInit () ;
+  /**
+   * \brief Initialize the required component to support the deep sleep functionalities.
+   *
+   * Function called during boot process by IRQbspInit to setup support for deep sleep state
+   *  enabling programmable wakeup timer for RTC as described in the refernence manual of
+   * STM32F407VG (the EXTI lines should be also  configured)
+   */
+  void IRQdeepSleepInit () ;
 
 }
 
