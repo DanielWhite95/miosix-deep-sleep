@@ -616,7 +616,7 @@ void Thread::IRQwakeup()
 }
 
 bool Thread::IRQexists(Thread* p)
-
+{
     if(p==NULL) return false;
     return Scheduler::PKexists(p);
 }
