@@ -57,7 +57,7 @@ namespace miosix {
     {
       rtc.IRQenterWakeupStopModeFor(reltime);
     }
-    //   cstimer.IRQsetCurrentTime(abstime);
+    cstimer.IRQsetCurrentTime(abstime);
   }
 
   void IRQdeepSleepInit ()

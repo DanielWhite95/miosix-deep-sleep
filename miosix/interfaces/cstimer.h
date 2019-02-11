@@ -46,13 +46,13 @@ public:
     /**
      * Set the current tick count of the timer as nanoseconds
      */
-    void setCurrentTime(long long) const;
+    void setCurrentTime(long long) ;
 
     /**
      * Set the current tick in a secure environment where interrupts are
      * already disabled
      */ 
-    void IRQsetCurrentTime(long long) const;
+    void IRQsetCurrentTime(long long) ;
     
     /**
      * \return the current tick count of the timer (in terms of nanoseconds)
@@ -80,6 +80,7 @@ private:
     ContextSwitchTimer();
     unsigned int timerFreq;
     ContextSwitchTimerImpl* pImpl;
+    long long set_offset; // offset used to set current time
 };
 
 } //namespace miosix
