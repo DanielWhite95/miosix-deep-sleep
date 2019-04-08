@@ -44,6 +44,8 @@
 #include "filesystem/file_access.h"
 #include "filesystem/console/console_device.h"
 #include "drivers/serial.h"
+#include "drivers/rtc.h"
+#include "drivers/power_manager.h"
 #include "drivers/sd_stm32f2_f4.h"
 #include "board_settings.h"
 #include "interfaces/deep_sleep.h"
@@ -56,12 +58,22 @@ typedef Gpio<GPIOD_BASE,4>  cs43l22reset;
 // Initialization
 //
 
-void IRQbspInit()
-{
+  void IRQbspInit()
+  {
+
+    /* Taken from STM32 example */
+
+    RCC->CR |= (uint32_t)0x00000001;
+    RCC->CFGR = 0x00000000;
+    RCC->CR &= (uint32_t)0xFEF6FFFF;
+    RCC->PLLCFGR = 0x24003010;
+    RCC->CR &= (uint32_t)0xFFFBFFFF;
+    RCC->CIR = 0x00000000;
+
     //Enable all gpios
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN |
-                    RCC_AHB1ENR_GPIOCEN | RCC_AHB1ENR_GPIODEN |
-                    RCC_AHB1ENR_GPIOEEN | RCC_AHB1ENR_GPIOHEN;
+      RCC_AHB1ENR_GPIOCEN | RCC_AHB1ENR_GPIODEN |
+      RCC_AHB1ENR_GPIOEEN | RCC_AHB1ENR_GPIOHEN;
     RCC_SYNC();
     GPIOA->OSPEEDR=0xaaaaaaaa; //Default to 50MHz speed for all GPIOS
     GPIOB->OSPEEDR=0xaaaaaaaa;
@@ -78,9 +90,9 @@ void IRQbspInit()
     cs43l22reset::mode(Mode::OUTPUT);
     cs43l22reset::low();
     DefaultConsole::instance().IRQset(intrusive_ref_ptr<Device>(
-        new STM32Serial(defaultSerial,defaultSerialSpeed,
-        defaultSerialFlowctrl ? STM32Serial::RTSCTS : STM32Serial::NOFLOWCTRL)));
-}
+								new STM32Serial(defaultSerial,defaultSerialSpeed,
+										defaultSerialFlowctrl ? STM32Serial::RTSCTS : STM32Serial::NOFLOWCTRL)));
+  }
 
 void bspInit2()
 {
@@ -95,9 +107,14 @@ void bspInit2()
     #endif //AUX_SERIAL
     #endif //WITH_FILESYSTEM
 
+    {
+      FastInterruptDisableLock d;
+      PowerManagement::instance();
+      Rtc::instance();
 #ifdef WITH_DEEP_SLEEP
-    IRQdeepSleepInit();
+      IRQdeepSleepInit();
 #endif // WITH_DEEP_SLEEP
+    }
 }
 
 //
