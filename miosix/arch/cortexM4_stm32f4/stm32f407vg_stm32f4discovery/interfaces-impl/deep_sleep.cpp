@@ -51,15 +51,15 @@ namespace miosix {
     {
       // Too late for deep-sleep, use normal sleep
       miosix_private::sleepCpu();
-      return; 
     }
     else
     {
       red::high();
       pm.IRQgoDeepSleepFor(reltime);
       red::low();
-      return;
+      cstimer.IRQsetCurrentTime(abstime);
     }
+    return;
   }
 
   void IRQdeepSleepInit ()
