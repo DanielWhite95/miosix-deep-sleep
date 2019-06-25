@@ -67,6 +67,12 @@ public:
     {
         return timerFreq;
     }
+
+    /** 
+     * \return the set_offset variable used in IRQgetCurrentTime
+     * useful for external computation
+     */
+    const long long getOffset() const;
     
     /**
      * Destructor
@@ -82,7 +88,6 @@ private:
     ContextSwitchTimer();
     unsigned int timerFreq;
     ContextSwitchTimerImpl* pImpl;
-    long long set_offset; // offset used to set current time
 };
 
 } //namespace miosix
