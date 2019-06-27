@@ -50,8 +50,9 @@ static inline long long IRQgetTick()
     //can be disabeld, equals to one hardware timer period minus the time
     //between the two timer reads in this algorithm.
     unsigned int counter=TIM2->CNT;
-    if((TIM2->SR & TIM_SR_UIF) && TIM2->CNT>=counter)
+    if((TIM2->SR & TIM_SR_UIF) && TIM2->CNT>=counter) {
       return (ms32time | static_cast<long long>(counter)) + overflowIncrement;
+    }
     return ms32time | static_cast<long long>(counter);
 }
 
@@ -96,9 +97,7 @@ ContextSwitchTimer& ContextSwitchTimer::instance()
 
 void ContextSwitchTimer::IRQsetNextInterrupt(long long ns)
 {
-  long long currentTick = IRQgetTick();
-  long long closest_time = std::max<long long>(ns - set_offset, tc->tick2ns(currentTick)); // offset should be always less than input
-  long long tick = tc->ns2tick(closest_time); 
+  long long tick =  std::max<long long>(tc->ns2tick(ns - set_offset), IRQgetTick()); 
     ms32chkp = tick & upperMask;
     TIM2->CCR1 = static_cast<unsigned int>(tick & lowerMask);
     if(IRQgetTick() >= nextInterrupt())
