@@ -61,15 +61,6 @@ typedef Gpio<GPIOD_BASE,4>  cs43l22reset;
   void IRQbspInit()
   {
 
-    /* Taken from STM32 example */
-
-    RCC->CR |= (uint32_t)0x00000001;
-    RCC->CFGR = 0x00000000;
-    RCC->CR &= (uint32_t)0xFEF6FFFF;
-    RCC->PLLCFGR = 0x24003010;
-    RCC->CR &= (uint32_t)0xFFFBFFFF;
-    RCC->CIR = 0x00000000;
-
     //Enable all gpios
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN |
       RCC_AHB1ENR_GPIOCEN | RCC_AHB1ENR_GPIODEN |
