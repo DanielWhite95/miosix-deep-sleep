@@ -33,9 +33,10 @@
 // file. After that, comment out this line to disable the reminder error.
 // The PARSING_FROM_IDE is because Netbeans gets confused by this, it is never
 // defined when compiling the code.
-#ifndef PARSING_FROM_IDE */
-#error This error is a reminder that you have not edited miosix_settings.h yet. */
-#endif //PARSING_FROM_IDE */
+/* #ifndef PARSING_FROM_IDE *\/ */
+/* #error This error is a reminder that you have not edited miosix_settings.h yet. *\/ */
+/* #endif //PARSING_FROM_IDE *\/ */
+>>>>>>> Stashed changes
 
 /**
  * \file miosix_settings.h
@@ -106,9 +107,6 @@ namespace miosix {
 /// automatically when peripherals are not required
 #define WITH_DEEP_SLEEP
   
-/// \def DEBUG_DEEP_SLEEP 
-  /// Work with WITH_DEEP_SLEEP and blink a system led when the board is in deep sleep mode, so the developer can see it
-// #define DEBUG_DEEP_SLEEP
 
 
 /// Maximum number of open files. Trying to open more will fail.
