@@ -1077,7 +1077,7 @@ struct SleepData : public IntrusiveListItem
     ///\internal Thread that is sleeping
     Thread *p;
     
-    ///\internal When this number becomes equal to the kernel stick,
+    ///\internal When this number becomes equal to the kernel tick,
     ///the thread will wake
     long long wakeup_time;
 };
